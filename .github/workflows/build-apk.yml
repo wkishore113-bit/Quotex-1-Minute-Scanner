@@ -23,17 +23,23 @@ jobs:
       - name: Extract Android project
         run: |
           mkdir -p source
-          ZIP=$(find . -maxdepth 2 -name '*.zip' | head -1)
-          if [ -z "$ZIP" ]; then
-            echo "Project ZIP not found"
+          ZIP="./Quotex_1m_Android_Scanner_Source (2).zip"
+
+          if [ ! -f "$ZIP" ]; then
+            echo "Latest project ZIP not found: $ZIP"
+            ls -la
             exit 1
           fi
+
           unzip -q "$ZIP" -d source
+
           PROJECT=$(find source \( -name settings.gradle.kts -o -name settings.gradle \) -print -quit | xargs dirname)
+
           if [ -z "$PROJECT" ]; then
             echo "Gradle project not found"
             exit 1
           fi
+
           echo "PROJECT_DIR=$PROJECT" >> "$GITHUB_ENV"
 
       - name: Align Java and Kotlin versions
@@ -42,17 +48,22 @@ jobs:
           import os
           import re
           from pathlib import Path
+
           p = Path(os.environ["PROJECT_DIR"]) / "app/build.gradle.kts"
           s = p.read_text()
+
           block = """android {
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
               }
           """
+
           s, count = re.subn(r'android\s*\{', block, s, count=1)
+
           if count == 0:
               raise SystemExit("Android configuration not found")
+
           p.write_text(s)
           print("Java compatibility set to 17")
           PY
@@ -60,14 +71,13 @@ jobs:
       - name: Check Gradle files
         run: |
           echo "Project directory: $PROJECT_DIR"
-          echo "Files in project:"
-          find source -maxdepth 5 -type f | sort | head -100
-          echo "Searching for Gradle wrapper:"
+          find source -maxdepth 6 -type f | sort | head -100
           find source \( -name gradlew -o -name gradle-wrapper.properties \)
 
       - name: Build Android APK
         run: |
           cd "$PROJECT_DIR"
+
           if [ -f gradlew ]; then
             chmod +x gradlew
             ./gradlew assembleDebug
