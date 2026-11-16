@@ -26,23 +26,29 @@ jobs:
           ZIP="./Quotex_1m_Android_Scanner_Source (2).zip"
 
           if [ ! -f "$ZIP" ]; then
-            echo "Latest project ZIP not found: $ZIP"
-            ls -la
+            echo "Latest project ZIP not found"
             exit 1
           fi
 
           unzip -q "$ZIP" -d source
 
-          PROJECT=$(find source \( -name settings.gradle.kts -o -name settings.gradle \) -print -quit | xargs dirname)
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
 
-          if [ -z "$PROJECT" ]; then
-            echo "Gradle project not found"
-            exit 1
-          fi
+          roots = Path("source").rglob("settings.gradle*")
+          settings = next((p for p in roots if p.is_file()), None)
 
-          echo "PROJECT_DIR=$PROJECT" >> "$GITHUB_ENV"
+          if settings is None:
+              raise SystemExit("Gradle settings file not found")
 
-      - name: Align Java and Kotlin versions
+          project = settings.parent.resolve()
+          print("Project directory:", project)
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"PROJECT_DIR={project}\n")
+          PY
+
+      - name: Align Java version
         run: |
           python3 - <<'PY'
           import os
@@ -50,8 +56,11 @@ jobs:
           from pathlib import Path
 
           p = Path(os.environ["PROJECT_DIR"]) / "app/build.gradle.kts"
-          s = p.read_text()
 
+          if not p.exists():
+              raise SystemExit("app/build.gradle.kts not found")
+
+          s = p.read_text()
           block = """android {
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
@@ -68,11 +77,11 @@ jobs:
           print("Java compatibility set to 17")
           PY
 
-      - name: Check Gradle files
+      - name: Check project files
         run: |
           echo "Project directory: $PROJECT_DIR"
-          find source -maxdepth 6 -type f | sort | head -100
-          find source \( -name gradlew -o -name gradle-wrapper.properties \)
+          ls -la "$PROJECT_DIR"
+          ls -la "$PROJECT_DIR/app"
 
       - name: Build Android APK
         run: |
@@ -84,7 +93,7 @@ jobs:
           elif command -v gradle >/dev/null 2>&1; then
             gradle assembleDebug
           else
-            echo "Gradle wrapper and system Gradle are missing"
+            echo "Gradle is missing"
             exit 1
           fi
 
