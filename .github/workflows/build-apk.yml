@@ -1,4 +1,12 @@
 
+      - name: Check Gradle files
+        run: |
+          echo "Project directory: $PROJECT_DIR"
+          echo "Files in project:"
+          find source -maxdepth 4 -type f | sort | head -100
+          echo "Searching for Gradle wrapper:"
+          find source -name gradlew -o -name gradle-wrapper.properties
+
 name: Build Android APK
 
 on:
