@@ -29,41 +29,43 @@ jobs:
             exit 1
           fi
           unzip -q "$ZIP" -d source
-          PROJECT=$(find source -name settings.gradle.kts -o -name settings.gradle | head -1 | xargs dirname)
+          PROJECT=$(find source \( -name settings.gradle.kts -o -name settings.gradle \) -print -quit | xargs dirname)
           if [ -z "$PROJECT" ]; then
             echo "Gradle project not found"
             exit 1
           fi
           echo "PROJECT_DIR=$PROJECT" >> "$GITHUB_ENV"
 
-      
       - name: Align Java and Kotlin versions
         run: |
           python3 - <<'PY'
           import os
           import re
           from pathlib import Path
-
           p = Path(os.environ["PROJECT_DIR"]) / "app/build.gradle.kts"
           s = p.read_text()
-
           block = """android {
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
               }
           """
-
-          s, count = re.subn(
-              r'android\s*\{',
-              block,
-              s,
-              count=1
-          )
-
+          s, count = re.subn(r'android\s*\{', block, s, count=1)
           if count == 0:
               raise SystemExit("Android configuration not found")
-
           p.write_text(s)
           print("Java compatibility set to 17")
           PY
+
+      - name: Build Android APK
+        run: |
+          cd "$PROJECT_DIR"
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Quotex-Scanner-APK
+          path: source/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
