@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,17 +20,22 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Prepare Android project
+      - name: Extract Android project
         run: |
+          mkdir -p source
           ZIP=$(find . -maxdepth 2 -name '*.zip' | head -1)
-          if [ -n "$ZIP" ]; then
-            mkdir source
-            unzip -q "$ZIP" -d source
+          if [ -z "$ZIP" ]; then
+            echo "Project ZIP not found"
+            exit 1
           fi
-          PROJECT=$(find . -name settings.gradle.kts -o -name settings.gradle | head -1 | xargs dirname)
+          unzip -q "$ZIP" -d source
+          PROJECT=$(find source -name settings.gradle.kts -o -name settings.gradle | head -1 | xargs dirname)
+          if [ -z "$PROJECT" ]; then
+            echo "Gradle project not found"
+            exit 1
+          fi
           echo "PROJECT_DIR=$PROJECT" >> "$GITHUB_ENV"
 
-      
       - name: Align Java and Kotlin versions
         run: |
           python3 - <<'PY'
@@ -51,3 +57,19 @@ jobs:
           p.write_text(s)
           PY
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build Android APK
+        run: |
+          cd "$PROJECT_DIR"
+          gradle assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Quotex-Scanner-APK
+          path: '**/build/outputs/apk/debug/*.apk'
+          if-no-files-found: error
