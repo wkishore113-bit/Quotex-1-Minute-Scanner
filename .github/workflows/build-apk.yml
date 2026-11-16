@@ -29,18 +29,25 @@ jobs:
           PROJECT=$(find . -name settings.gradle.kts -o -name settings.gradle | head -1 | xargs dirname)
           echo "PROJECT_DIR=$PROJECT" >> "$GITHUB_ENV"
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-
-      - name: Build APK
+      
+      - name: Align Java and Kotlin versions
         run: |
-          cd "$PROJECT_DIR"
-          gradle assembleDebug
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          p = Path(os.environ["PROJECT_DIR"]) / "app/build.gradle.kts"
+          s = p.read_text()
+          s += """
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Quotex-Scanner-APK
-          path: '**/build/outputs/apk/debug/*.apk'
+          tasks.withType<JavaCompile>().configureEach {
+              sourceCompatibility = "17"
+              targetCompatibility = "17"
+          }
+
+          tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+              kotlinOptions.jvmTarget = "17"
+          }
+          """
+          p.write_text(s)
+          PY
+
