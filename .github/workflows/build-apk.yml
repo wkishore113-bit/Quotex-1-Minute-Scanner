@@ -1,12 +1,4 @@
 
-      - name: Check Gradle files
-        run: |
-          echo "Project directory: $PROJECT_DIR"
-          echo "Files in project:"
-          find source -maxdepth 4 -type f | sort | head -100
-          echo "Searching for Gradle wrapper:"
-          find source -name gradlew -o -name gradle-wrapper.properties
-
 name: Build Android APK
 
 on:
@@ -65,11 +57,26 @@ jobs:
           print("Java compatibility set to 17")
           PY
 
+      - name: Check Gradle files
+        run: |
+          echo "Project directory: $PROJECT_DIR"
+          echo "Files in project:"
+          find source -maxdepth 5 -type f | sort | head -100
+          echo "Searching for Gradle wrapper:"
+          find source \( -name gradlew -o -name gradle-wrapper.properties \)
+
       - name: Build Android APK
         run: |
           cd "$PROJECT_DIR"
-          chmod +x gradlew
-          ./gradlew assembleDebug
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+            ./gradlew assembleDebug
+          elif command -v gradle >/dev/null 2>&1; then
+            gradle assembleDebug
+          else
+            echo "Gradle wrapper and system Gradle are missing"
+            exit 1
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
