@@ -20,13 +20,19 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Install Gradle 8.9
+        run: |
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp
+          /tmp/gradle-8.9/bin/gradle --version
+
       - name: Extract Android project
         run: |
           mkdir -p source
           ZIP="./Quotex_1m_Android_Scanner_Source (2).zip"
 
           if [ ! -f "$ZIP" ]; then
-            echo "Latest project ZIP not found"
+            echo "Project ZIP not found"
             exit 1
           fi
 
@@ -36,14 +42,17 @@ jobs:
           import os
           from pathlib import Path
 
-          roots = Path("source").rglob("settings.gradle*")
-          settings = next((p for p in roots if p.is_file()), None)
+          settings = next(
+              (p for p in Path("source").rglob("settings.gradle*") if p.is_file()),
+              None
+          )
 
           if settings is None:
               raise SystemExit("Gradle settings file not found")
 
           project = settings.parent.resolve()
           print("Project directory:", project)
+
           with open(os.environ["GITHUB_ENV"], "a") as f:
               f.write(f"PROJECT_DIR={project}\n")
           PY
@@ -61,6 +70,7 @@ jobs:
               raise SystemExit("app/build.gradle.kts not found")
 
           s = p.read_text()
+
           block = """android {
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
@@ -86,16 +96,7 @@ jobs:
       - name: Build Android APK
         run: |
           cd "$PROJECT_DIR"
-
-          if [ -f gradlew ]; then
-            chmod +x gradlew
-            ./gradlew assembleDebug
-          elif command -v gradle >/dev/null 2>&1; then
-            gradle assembleDebug
-          else
-            echo "Gradle is missing"
-            exit 1
-          fi
+          /tmp/gradle-8.9/bin/gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
